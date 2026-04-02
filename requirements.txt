@@ -1,0 +1,82 @@
+import nltk
+import spacy
+import pandas as pd
+from nltk.corpus import stopwords
+from nltk.tokenize import word_tokenize
+from nltk.stem import PorterStemmer, WordNetLemmatizer
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score
+import string
+
+# Tải dữ liệu cần thiết cho NLTK
+nltk.download('punkt')
+nltk.download('stopwords')
+nltk.download('wordnet')
+nltk.download('omw-1.4')
+
+# Tải mô hình spaCy
+nlp = spacy.load("en_core_web_sm")
+
+# --- 1. Prepare 3 simple different sentences ---
+sentences = [
+    "The quick brown foxes are jumping over the lazy dogs.",
+    "Data science is an amazing field with many opportunities.",
+    "Artificial intelligence is transforming the modern world rapidly."
+]
+
+# --- 2. Gold Data for Evaluation ---
+# Giả định đây là kết quả tokens "chuẩn" sau khi đã tiền xử lý để so sánh
+gold_data = [
+    ["quick", "brown", "fox", "jump", "lazi", "dog"],
+    ["data", "scienc", "amaz", "field", "mani", "opportun"],
+    ["artifici", "intellig", "transform", "modern", "world", "rapidli"]
+]
+
+def preprocess_nltk(text):
+    # Lowercasing
+    text = text.lower()
+    # Punctuation Removal
+    text = text.translate(str.maketrans('', '', string.punctuation))
+    # Tokenization
+    tokens = word_tokenize(text)
+    # Stopword Removal
+    stop_words = set(stopwords.words('english'))
+    tokens = [t for t in tokens if t not in stop_words]
+    # Stemming
+    stemmer = PorterStemmer()
+    stemmed = [stemmer.stem(t) for t in tokens]
+    # Lemmatization
+    lemmatizer = WordNetLemmatizer()
+    lemmatized = [lemmatizer.lemmatize(t) for t in stemmed]
+    return lemmatized
+
+def preprocess_spacy(text):
+    doc = nlp(text.lower())
+    # Tokenization, Stopword/Punctuation Removal, Lemmatization
+    processed = [token.lemma_ for token in doc if not token.is_stop and not token.is_punct]
+    return processed
+
+# Chạy xử lý
+nltk_results = [preprocess_nltk(s) for s in sentences]
+spacy_results = [preprocess_spacy(s) for s in sentences]
+
+# --- 3. Evaluation Function ---
+def evaluate(y_true, y_pred):
+    # Chuyển đổi list về dạng chuỗi đơn giản để so sánh (đơn giản hóa cho ví dụ)
+    # Trong thực tế, việc đánh giá NLP thường dựa trên từng token
+    flatten_true = [item for sublist in y_true for item in sublist]
+    flatten_pred = [item for sublist in y_pred for item in sublist]
+    
+    # Đảm bảo độ dài bằng nhau để tính toán (padding nếu cần)
+    max_len = max(len(flatten_true), len(flatten_pred))
+    flatten_true += [''] * (max_len - len(flatten_true))
+    flatten_pred += [''] * (max_len - len(flatten_pred))
+
+    return {
+        "Accuracy": accuracy_score(flatten_true, flatten_pred),
+        "Precision": precision_score(flatten_true, flatten_pred, average='weighted', zero_division=0),
+        "Recall": recall_score(flatten_true, flatten_pred, average='weighted', zero_division=0),
+        "F1-score": f1_score(flatten_true, flatten_pred, average='weighted', zero_division=0)
+    }
+
+print("NLTK Evaluation:", evaluate(gold_data, nltk_results))
+print("spaCy Evaluation:", evaluate(gold_data, spacy_results))
